@@ -4,13 +4,14 @@
 POSTGIS_VERSION=2.3.11
 POSTGIS_MAJOR_VERSION=2.3
 
-POSTGRES_VERSION=9.6.19
+POSTGRES_VERSION=9.6.22
 POSTGRES_MAJOR_VERSION=9.6
 POSTGRES_DOWNLOAD_URL=https://ftp.postgresql.org/pub/source/v$(POSTGRES_VERSION)
 
 POSTGRESAPP_VERSION=$(POSTGRES_VERSION)
 
-# http://trac.osgeo.org/gdal/wiki/DownloadSource
+# https://github.com/OSGeo/gdal/releases
+# http://download.osgeo.org/gdal/
 GDAL_VERSION=2.1.3
 # 2.1.4 doesn't build on macOS 10.10 with Xcode 7.1.1
 
@@ -27,7 +28,7 @@ LIBJASPER_VERSION=1.900.1
 LIBXML2_VERSION=2.9.10
 
 # https://www.openssl.org
-OPENSSL_VERSION=1.1.1h
+OPENSSL_VERSION=1.1.1k
 
 # http://proj4.org/download.html
 PROJ_VERSION=4.9.3
@@ -44,7 +45,7 @@ PLV8_VERSION=1.4.8
 JSONC_VERSION=0.12.1
 
 # http://simplesystems.org/libtiff/
-LIBTIFF_VERSION=4.1.0
+LIBTIFF_VERSION=4.2.0
 
 
 #path configuration
@@ -72,6 +73,7 @@ all: postgresql postgis plv8 pldebugger
 clean: clean-postgresql clean-openssl clean-libxml2 clean-libgdal clean-libproj clean-postgis clean-plv8 clean-libjpeg clean-libjasper clean-libgeos clean-libtiff clean-json-c clean-pldebugger
 	rm -Rf "$(PREFIX)"
 check: check-postgresql
+download: postgresql-$(POSTGRES_VERSION).tar.bz2 openssl-${OPENSSL_VERSION}.tar.gz libxml2-${LIBXML2_VERSION}.tar.gz libedit-$(LIBEDIT_VERSION).tar.gz jasper-$(LIBJASPER_VERSION).uuid.tar.gz jpegsrc.v$(JPEG_VERSION).tar.gz geos-${GEOS_VERSION}.tar.bz2 gdal-${GDAL_VERSION}.tar.gz proj-${PROJ_VERSION}.tar.gz proj-datumgrid-${DATUMGRID_VERSION}.zip json-c-$(JSONC_VERSION).tar.gz tiff-$(LIBTIFF_VERSION).tar.gz postgis-${POSTGIS_VERSION}.tar.gz plv8-${PLV8_VERSION}.tar.gz v8-${V8_VERSION}.tar.gz 
 
 #########################
 ###### PostgreSQL #######
@@ -268,11 +270,11 @@ libgdal: $(PREFIX)/lib/libgdal.dylib
 $(PREFIX)/lib/libgdal.dylib: gdal-$(GDAL_VERSION)/GNUMakefile
 	make -C gdal-$(GDAL_VERSION) install
 
-gdal-$(GDAL_VERSION)/GNUMakefile: gdal-$(GDAL_VERSION)/autogen.sh  $(PREFIX)/include/json-c/json_object_iterator.h $(PREFIX)/lib/libproj.dylib $(PREFIX)/lib/libjasper.dylib  $(PREFIX)/lib/libjpeg.dylib $(PREFIX)/bin/psql $(PREFIX)/lib/libtiff.dylib
-	cd gdal-$(GDAL_VERSION) && ./autogen.sh && ./configure --prefix="$(PREFIX)" --with-pg="$(PREFIX)/bin/pg_config"  --with-jpeg="$(PREFIX)" --with-jasper="$(PREFIX)" --with-libjson-c="$(PREFIX)" --with-static-proj4="$(PWD)/proj-$(PROJ_VERSION)/src/.libs"
+gdal-$(GDAL_VERSION)/GNUMakefile: gdal-$(GDAL_VERSION)/configure  $(PREFIX)/include/json-c/json_object_iterator.h $(PREFIX)/lib/libproj.dylib $(PREFIX)/lib/libjasper.dylib  $(PREFIX)/lib/libjpeg.dylib $(PREFIX)/bin/psql $(PREFIX)/lib/libtiff.dylib
+	cd gdal-$(GDAL_VERSION) && ./configure --prefix="$(PREFIX)" --with-pg="$(PREFIX)/bin/pg_config"  --with-jpeg="$(PREFIX)" --with-jasper="$(PREFIX)" --with-libjson-c="$(PREFIX)" --with-static-proj4="$(PWD)/proj-$(PROJ_VERSION)/src/.libs"
 	touch $@
 
-gdal-$(GDAL_VERSION)/autogen.sh: gdal-${GDAL_VERSION}.tar.gz
+gdal-$(GDAL_VERSION)/configure: gdal-${GDAL_VERSION}.tar.gz
 	$(TAR) gdal-${GDAL_VERSION}.tar.gz
 	touch $@	
 
@@ -379,12 +381,12 @@ $(PREFIX)/lib/postgresql/postgis-$(POSTGIS_MAJOR_VERSION).so: postgis-${POSTGIS_
 	make -C postgis-${POSTGIS_VERSION}
 	make -C postgis-${POSTGIS_VERSION} install
 
-postgis-${POSTGIS_VERSION}/GNUMakefile: postgis-${POSTGIS_VERSION}/autogen.sh $(PREFIX)/lib/libgdal.dylib $(PREFIX)/lib/libgeos.dylib $(PREFIX)/lib/libjpeg.dylib $(PREFIX)/bin/psql $(PREFIX)/include/json-c/json_object_iterator.h
-	cd postgis-${POSTGIS_VERSION} && ./autogen.sh && ./configure --prefix="$(PREFIX)" --with-pgconfig="$(PREFIX)/bin/pg_config" --with-geosconfig="$(PREFIX)/bin/geos-config" --with-projdir="$(PREFIX)" --with-gdaldir="$(PREFIX)" --with-jsondir="$(PREFIX)" PCRE_CPPFLAGS="-I$(PCRE_INCLUDE_PATH)"
+postgis-${POSTGIS_VERSION}/GNUMakefile: postgis-${POSTGIS_VERSION}/configure $(PREFIX)/lib/libgdal.dylib $(PREFIX)/lib/libgeos.dylib $(PREFIX)/lib/libjpeg.dylib $(PREFIX)/bin/psql $(PREFIX)/include/json-c/json_object_iterator.h
+	cd postgis-${POSTGIS_VERSION} && ./configure --prefix="$(PREFIX)" --with-pgconfig="$(PREFIX)/bin/pg_config" --with-geosconfig="$(PREFIX)/bin/geos-config" --with-projdir="$(PREFIX)" --with-gdaldir="$(PREFIX)" --with-jsondir="$(PREFIX)" PCRE_CPPFLAGS="-I$(PCRE_INCLUDE_PATH)"
 	/usr/bin/sed -i -e 's#/usr/local$$#"$(PREFIX)"#g' postgis-${POSTGIS_VERSION}/liblwgeom/Makefile
 	touch $@
 
-postgis-${POSTGIS_VERSION}/autogen.sh: postgis-${POSTGIS_VERSION}.tar.gz
+postgis-${POSTGIS_VERSION}/configure: postgis-${POSTGIS_VERSION}.tar.gz
 	$(TAR) $<
 	touch $@
 
@@ -451,7 +453,7 @@ $(PREFIX)/lib/postgresql/plugin_debugger.so: pldebugger/Makefile $(PREFIX)/bin/p
 	export PGHOME="$(PREFIX)"; export PG_CONFIG="$(PREFIX)/bin/pg_config"; export USE_PGXS=1; make -C pldebugger install
 
 pldebugger/Makefile:
-	git clone git://git.postgresql.org/git/pldebugger.git
+	git clone https://github.com/EnterpriseDB/pldebugger.git
 	touch $@
 
 clean-pldebugger:

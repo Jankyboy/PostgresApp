@@ -81,27 +81,8 @@ class AddServerViewController: NSViewController, MainWindowModelConsumer {
 	
 	
 	private func loadVersions() {
-		guard let versionsPathEnum = FileManager().enumerator(at: URL(fileURLWithPath: Server.VersionsPath), includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsSubdirectoryDescendants, .skipsPackageDescendants, .skipsHiddenFiles]) else { return }
-		while let itemURL = versionsPathEnum.nextObject() as? URL {
-			do {
-				let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
-				guard resourceValues.isDirectory == true else { continue }
-			} catch { continue }
-			let folderName = itemURL.lastPathComponent
-			if isPostgresVersion(folderName) {
-				versions.append(folderName)
-			}
-		}
-        versions.sort { (a, b) -> Bool in
-            return a.compare(b, options:[.numeric], range: a.startIndex ..< a.endIndex, locale: nil) == .orderedAscending
-        }
+		versions = Server.availableBinaryVersions
 		selectedVersionIdx = versions.count-1
-	}
-	
-	
-	private func isPostgresVersion(_ s: String) -> Bool {
-		let regex = try! NSRegularExpression(pattern: "\\d+(\\.\\d+)?$", options: .caseInsensitive)
-		return regex.numberOfMatches(in: s, options: [], range: NSRange(0..<s.utf16.count)) != 0
 	}
 	
 }

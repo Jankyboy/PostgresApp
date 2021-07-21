@@ -1,36 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"  xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <channel>
-    <title>Postgres Changelog</title>
-    <link>https://postgresapp.com/sparkle/updates_9.5_9.6_10.xml</link>
-    <description>Most recent changes with links to updates.</description>
-    <language>en</language>
-	<item>
-		<title>Postgres.app 2.3.5</title>
-		<description>
-			<![CDATA[
-				<ul>
-					<li>PostgreSQL 9.5.22 with PostGIS 2.2.8</li>
-					<li>PostgreSQL 9.6.18 with PostGIS 2.3.10</li>
-					<li>PostgreSQL 10.13 with PostGIS 2.4.8</li>
-				</ul>
-				<p>
-					To save bandwidth, this update only includes bugfix updates for PostgreSQL server versions you already have installed.
-					You can download other versions of PostgreSQL on our website:
-					<a href="https://postgresapp.com/downloads.html">postgresapp.com/downloads.html</a>
-				</p>
-			]]>
-		</description>
-		<pubDate>Thu, 14 May 2020 16:28:58 +0200</pubDate>
-		<enclosure
-		url="https://github.com/PostgresApp/PostgresApp/releases/download/v2.3.5/Postgres-2.3.5-9.5-9.6-10.dmg"
-		sparkle:version="74"
-		sparkle:shortVersionString="2.3.5"
-		length="148434173"
-		type="application/octet-stream"
-		sparkle:dsaSignature="MC0CFQCnFjE19EtxEwXZCmYEoZwE6rpqEgIUd/UYi2uWTLDreZNwfb18TPD8+y4="
-		/>
-		<sparkle:minimumSystemVersion>10.12</sparkle:minimumSystemVersion>
-	</item>
-  </channel>
-</rss>
+---
+---
+{% include_relative updates_9.5_9.6_10_11_12_13.xml %}

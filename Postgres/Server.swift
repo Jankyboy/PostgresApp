@@ -39,12 +39,30 @@ class Server: NSObject {
 			NotificationCenter.default.post(name: Server.PropertyChangedNotification, object: self)
 		}
 	}
+    @objc var subtitle: String {
+        var infos = [String]()
+        infos.append("Port \(self.port)")
+        if let v = self.displayVersion { infos.append("v\(v)")}
+        if is_arm_mac() {
+            if let arch = self.binaryArchitecture { infos.append(arch) }
+        }
+        return infos.joined(separator: " – ")
+    }
+    @objc static var keyPathsForValuesAffectingSubtitle: Set<String> { ["port", "binPath", "serverStatus"] }
+
+    
+    
 	@objc dynamic var port: UInt = 0 {
 		didSet {
 			NotificationCenter.default.post(name: Server.PropertyChangedNotification, object: self)
 		}
 	}
-	@objc dynamic var binPath: String = ""
+    @objc dynamic var binPath: String = "" {
+        didSet {
+            cachedArchitecture = nil
+            cachedBinaryVersion = nil
+        }
+    }
 	@objc dynamic var varPath: String = ""
 	@objc dynamic var startOnLogin: Bool = false {
 		didSet {
@@ -127,9 +145,19 @@ class Server: NSObject {
 			switch self.serverStatus {
 			
 			case .NoBinaries:
-				let userInfo = [
-					NSLocalizedDescriptionKey: NSLocalizedString("The binaries for this PostgreSQL server were not found", comment: ""),
+				var userInfo = [
+					NSLocalizedDescriptionKey: NSLocalizedString("Required PostgreSQL version not installed", comment: ""),
 				]
+				var recoverySuggestions = [String]()
+				if let dataDirVersion = self.dataDirectoryVersion {
+					recoverySuggestions.append(String(format: NSLocalizedString("The data directory was initialized with PostgreSQL %@.", comment: ""), dataDirVersion))
+				}
+				let versions = Self.availableBinaryVersions
+				if !versions.isEmpty {
+					recoverySuggestions.append(String(format: NSLocalizedString("This copy of Postgres.app includes the following PostgreSQL versions: %@.", comment: ""), versions.joined(separator: ", ")))
+				}
+				recoverySuggestions.append(NSLocalizedString("Please try downloading a different release of Postgres.app.", comment: ""))
+				userInfo[NSLocalizedRecoverySuggestionErrorKey] = recoverySuggestions.joined(separator: "\n\n")
 				statusResult = .Failure(NSError(domain: "com.postgresapp.Postgres2.server-status", code: 0, userInfo: userInfo))
 				
 			case .PortInUse:
@@ -536,10 +564,108 @@ class Server: NSObject {
 			return .Failure(NSError(domain: "com.postgresapp.Postgres2.createdb", code: 0, userInfo: userInfo))
 		}
 	}
+    
+    private var cachedArchitecture: String?
+    var binaryArchitecture: String? {
+        if let a = cachedArchitecture { return a }
+        let process = Process()
+        process.launchPath = "/usr/bin/lipo"
+        process.arguments = [
+            "-info", self.binPath + "/postgres"
+        ]
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.launch()
+        process.waitUntilExit()
+        let outputOrNil = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        guard let output = outputOrNil else { return nil }
+        guard process.terminationStatus == 0 else { return nil }
+        guard let splitIndex = output.lastIndex(of: ":") else { return nil }
+        let architectureStrings = output[splitIndex...]
+        switch (
+            architectureStrings.contains("arm"),
+            architectureStrings.contains("x86")
+        ) {
+        case (true, true):
+            cachedArchitecture = "Universal"
+        case (true, false):
+            cachedArchitecture = "ARM"
+        case (false, true):
+            cachedArchitecture = "Intel"
+        case (false, false):
+            return nil
+        }
+        return cachedArchitecture!
+    }
+
+    private var cachedBinaryVersion: String?
+    var binaryVersion: String? {
+        if let a = cachedBinaryVersion { return a }
+        let process = Process()
+        let launchPath = self.binPath + "/postgres"
+        guard FileManager().fileExists(atPath: launchPath) else { return nil }
+        process.launchPath = launchPath
+        process.arguments = [
+            "-V"
+        ]
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.launch()
+        process.waitUntilExit()
+        let outputOrNil = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        guard let output = outputOrNil else { return nil }
+        guard process.terminationStatus == 0 else { return nil }
+        guard let splitIndex = output.lastIndex(of: " ") else { return nil }
+        let versionString = output[splitIndex...]
+        cachedBinaryVersion = versionString.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cachedBinaryVersion!
+    }
 	
+	public static var availableBinaryVersions: [String] {
+		guard let versionsPathEnum = FileManager().enumerator(at: URL(fileURLWithPath: Server.VersionsPath), includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsSubdirectoryDescendants, .skipsPackageDescendants, .skipsHiddenFiles]) else { return [] }
+		var versions = [String]()
+		while let itemURL = versionsPathEnum.nextObject() as? URL {
+			do {
+				let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
+				guard resourceValues.isDirectory == true else { continue }
+			} catch { continue }
+			let folderName = itemURL.lastPathComponent
+			versions.append(folderName)
+		}
+		versions.sort { (a, b) -> Bool in
+			return a.compare(b, options:[.numeric], range: a.startIndex ..< a.endIndex, locale: nil) == .orderedAscending
+		}
+		return versions
+	}
+    
+    var dataDirectoryVersion: String? {
+        do {
+            let v = try String(contentsOfFile: pgVersionPath)
+            return v.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        catch {
+            return nil
+        }
+    }
+    
+    var displayVersion: String? {
+        switch (dataDirectoryVersion, binaryVersion) {
+        case (.some(let d), .some(let b)):
+            if b.hasPrefix(d) {
+                return b
+            } else {
+                // binary version and data dir version don't match
+                return nil
+            }
+        case (.some(let d), nil):
+            return d
+        case (nil, .some(let b)):
+            return b
+        case (nil, nil):
+            return nil
+        }
+    }
 }
-
-
 
 class Database: NSObject {
 	@objc dynamic var name: String = ""

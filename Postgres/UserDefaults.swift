@@ -18,6 +18,10 @@ extension UserDefaults {
 	}()
 	
 	func registerPostgresDefaults() {
-		self.register(defaults: ["ClientAppName": "Terminal", "StartLoginHelper": true])
+		self.register(defaults: [
+						"ClientAppName": "Terminal",
+						"StartLoginHelper": true,
+						"SidebarVisible": true,
+		])
 	}
 }
